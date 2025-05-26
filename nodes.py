@@ -62,7 +62,7 @@ class LoadAudioPath:
         files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f)) and f.split('.')[-1].lower() in ["wav", "mp3","flac","m4a"]]
         # 允许用户输入URL或选择本地文件
         return {"required":
-                    {"audio": (['<输入音频URL或选择本地文件>'] + sorted(files),)},
+                    {"audio": ("STRING", {"default": "<输入音频URL或选择本地文件>"}),},
                 }
 
     CATEGORY = "AIFSH_UVR5"
