@@ -60,13 +60,9 @@ class LoadAudioPath:
         input_dir = input_path
         files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f)) and f.split('.')[-1].lower() in ["wav", "mp3","flac","m4a"]]
         return {"required":
-                    {"source_type": (["file", "url"], {"default": "file"}),
-                     "audio": (sorted(files),),
-                     "url": ("STRING", {"default": ""}),
+                    {"source_type": (["file", "url"], {"default": "url"}),
+                     "audio": ("STRING", {"default": ""}),
                     },
-                "optional": {
-                    "_audio_changed": ("BOOLEAN", {"default": False, "visible": False}),
-                }
                }
 
     CATEGORY = "AIFSH_UVR5"
@@ -74,7 +70,7 @@ class LoadAudioPath:
     RETURN_TYPES = ("AUDIOPATH",)
     FUNCTION = "load_audio"
 
-    def load_audio(self, source_type, audio, url, _audio_changed=False):
+    def load_audio(self, source_type, audio, _audio_changed=False):
         if source_type == "file":
             audio_path = folder_paths.get_annotated_filepath(audio)
             return (audio_path,)
@@ -82,6 +78,7 @@ class LoadAudioPath:
             # 处理URL
             try:
                 # 生成文件名
+                url = audio
                 url_filename = os.path.basename(urllib.parse.urlparse(url).path)
                 if not url_filename or "." not in url_filename:
                     # URL没有有效文件名，生成随机文件名
