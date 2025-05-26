@@ -62,7 +62,7 @@ class LoadAudioPath:
         return {"required":
                     {"source_type": (["file", "url"], {"default": "file"}),
                      "audio": (sorted(files),),
-                     "url": ("STRING", {"default": ""})
+                     "url": ("STRING", {"default": ""}),
                     },
                 "optional": {
                     "_audio_changed": ("BOOLEAN", {"default": False, "visible": False}),
