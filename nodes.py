@@ -4,6 +4,11 @@ import torch
 import ffmpeg
 import hashlib
 import folder_paths
+import urllib.request
+import urllib.parse
+import urllib.error
+import tempfile
+import uuid
 from huggingface_hub import hf_hub_download
 from .uvr5.mdxnet import MDXNetDereverb
 from .uvr5.vr import AudioPre, AudioPreDeEcho
@@ -55,8 +60,9 @@ class LoadAudioPath:
     def INPUT_TYPES(s):
         input_dir = input_path
         files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f)) and f.split('.')[-1].lower() in ["wav", "mp3","flac","m4a"]]
+        # 允许用户输入URL或选择本地文件
         return {"required":
-                    {"audio": (sorted(files),)},
+                    {"audio": (['<输入音频URL或选择本地文件>'] + sorted(files),)},
                 }
 
     CATEGORY = "AIFSH_UVR5"
@@ -65,12 +71,29 @@ class LoadAudioPath:
     FUNCTION = "load_audio"
 
     def load_audio(self, audio):
-        audio_path = folder_paths.get_annotated_filepath(audio)
+        # 判断是否为URL
+        if audio.startswith('http://') or audio.startswith('https://'):
+            try:
+                url_path = urllib.parse.urlparse(audio).path
+                ext = os.path.splitext(url_path)[-1]
+                if ext.lower() not in ['.wav', '.mp3', '.flac', '.m4a']:
+                    ext = '.wav'  # 默认保存为wav
+                filename = f"url_{uuid.uuid4().hex}{ext}"
+                save_path = os.path.join(input_path, filename)
+                urllib.request.urlretrieve(audio, save_path)
+                audio_path = save_path
+            except Exception as e:
+                raise RuntimeError(f"下载音频失败: {e}")
+        else:
+            audio_path = folder_paths.get_annotated_filepath(audio)
         print(audio_path)
         return (audio_path,)
 
     @classmethod
     def IS_CHANGED(s, audio):
+        # 对于URL输入，直接用URL做hash，否则用文件内容hash
+        if audio.startswith('http://') or audio.startswith('https://'):
+            return hashlib.sha256(audio.encode('utf-8')).hexdigest()
         audio_path = folder_paths.get_annotated_filepath(audio)
         m = hashlib.sha256()
         with open(audio_path, 'rb') as f:
