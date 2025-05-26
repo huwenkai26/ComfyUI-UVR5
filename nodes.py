@@ -54,7 +54,6 @@ class PreViewAudio:
             m.update(f.read())
         return m.digest().hex()
 
-
 class LoadAudioPath:
     @classmethod
     def INPUT_TYPES(s):
@@ -62,9 +61,12 @@ class LoadAudioPath:
         files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f)) and f.split('.')[-1].lower() in ["wav", "mp3","flac","m4a"]]
         return {"required":
                     {"source_type": (["file", "url"], {"default": "file"}),
-                     "audio": (sorted(files), {"default": sorted(files)[0] if len(files) > 0 else None, "visible": True}),
-                     "url": ("STRING", {"default": "", "multiline": False, "visible": False})
-                    }
+                     "audio": (sorted(files),),
+                     "url": ("STRING", {"default": ""})
+                    },
+                "optional": {
+                    "_audio_changed": ("BOOLEAN", {"default": False, "visible": False}),
+                }
                }
 
     CATEGORY = "AIFSH_UVR5"
@@ -72,21 +74,21 @@ class LoadAudioPath:
     RETURN_TYPES = ("AUDIOPATH",)
     FUNCTION = "load_audio"
 
-    def load_audio(self, source_type, audio, url):
+    def load_audio(self, source_type, audio, url, _audio_changed=False):
         if source_type == "file":
             audio_path = folder_paths.get_annotated_filepath(audio)
             return (audio_path,)
         else:
             # 处理URL
             try:
-                # 生成一个唯一的文件名
+                # 生成文件名
                 url_filename = os.path.basename(urllib.parse.urlparse(url).path)
                 if not url_filename or "." not in url_filename:
-                    # 如果URL没有有效的文件名部分，生成随机文件名
-                    ext = ".mp3"  # 默认扩展名
+                    # URL没有有效文件名，生成随机文件名
+                    ext = ".mp3"
                     url_filename = f"{uuid.uuid4()}{ext}"
 
-                # 确保文件名有正确的扩展名
+                # 确保文件扩展名正确
                 file_ext = os.path.splitext(url_filename)[1].lower()
                 if file_ext not in [".wav", ".mp3", ".flac", ".m4a"]:
                     url_filename = f"{os.path.splitext(url_filename)[0]}.mp3"
@@ -103,7 +105,7 @@ class LoadAudioPath:
                 raise RuntimeError(f"无法从URL下载音频: {str(e)}")
 
     @classmethod
-    def IS_CHANGED(s, source_type, audio, url):
+    def IS_CHANGED(s, source_type, audio, url, _audio_changed=False):
         if source_type == "file":
             audio_path = folder_paths.get_annotated_filepath(audio)
             m = hashlib.sha256()
@@ -113,15 +115,6 @@ class LoadAudioPath:
         else:
             # URL模式下，只要URL变化就重新执行
             return url
-
-    # 添加UI字段可见性控制
-    @classmethod
-    def CHANGED_WIDGETS(s, source_type):
-        if source_type == "file":
-            return {"audio": {"visible": True}, "url": {"visible": False}}
-        else:
-            return {"audio": {"visible": False}, "url": {"visible": True}}
-
 class UVR5:
     """
     A example node
