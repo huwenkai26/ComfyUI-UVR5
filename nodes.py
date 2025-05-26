@@ -44,7 +44,7 @@ class PreViewAudio:
         tmp_path = os.path.dirname(audio)
         audio_root = os.path.basename(tmp_path)
         return {"ui": {"audio":[audio_name,audio_root]}}
-        
+
 
     @classmethod
     def IS_CHANGED(s, audio):
@@ -60,46 +60,67 @@ class LoadAudioPath:
     def INPUT_TYPES(s):
         input_dir = input_path
         files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f)) and f.split('.')[-1].lower() in ["wav", "mp3","flac","m4a"]]
-        # 允许用户输入URL或选择本地文件
         return {"required":
-                    {"audio": ("STRING", {"default": "<输入音频URL或选择本地文件>"}),},
-                }
+                    {"source_type": (["file", "url"], {"default": "file"}),
+                     "audio": (sorted(files), {"default": sorted(files)[0] if len(files) > 0 else None, "visible": True}),
+                     "url": ("STRING", {"default": "", "multiline": False, "visible": False})
+                    }
+               }
 
     CATEGORY = "AIFSH_UVR5"
 
     RETURN_TYPES = ("AUDIOPATH",)
     FUNCTION = "load_audio"
 
-    def load_audio(self, audio):
-        # 判断是否为URL
-        if audio.startswith('http://') or audio.startswith('https://'):
-            try:
-                url_path = urllib.parse.urlparse(audio).path
-                ext = os.path.splitext(url_path)[-1]
-                if ext.lower() not in ['.wav', '.mp3', '.flac', '.m4a']:
-                    ext = '.wav'  # 默认保存为wav
-                filename = f"url_{uuid.uuid4().hex}{ext}"
-                save_path = os.path.join(input_path, filename)
-                urllib.request.urlretrieve(audio, save_path)
-                audio_path = save_path
-            except Exception as e:
-                raise RuntimeError(f"下载音频失败: {e}")
-        else:
+    def load_audio(self, source_type, audio, url):
+        if source_type == "file":
             audio_path = folder_paths.get_annotated_filepath(audio)
-        print(audio_path)
-        return (audio_path,)
+            return (audio_path,)
+        else:
+            # 处理URL
+            try:
+                # 生成一个唯一的文件名
+                url_filename = os.path.basename(urllib.parse.urlparse(url).path)
+                if not url_filename or "." not in url_filename:
+                    # 如果URL没有有效的文件名部分，生成随机文件名
+                    ext = ".mp3"  # 默认扩展名
+                    url_filename = f"{uuid.uuid4()}{ext}"
+
+                # 确保文件名有正确的扩展名
+                file_ext = os.path.splitext(url_filename)[1].lower()
+                if file_ext not in [".wav", ".mp3", ".flac", ".m4a"]:
+                    url_filename = f"{os.path.splitext(url_filename)[0]}.mp3"
+
+                save_path = os.path.join(input_path, url_filename)
+
+                # 下载文件
+                print(f"下载音频文件: {url} 到 {save_path}")
+                urllib.request.urlretrieve(url, save_path)
+
+                return (save_path,)
+            except Exception as e:
+                print(f"下载音频文件失败: {str(e)}")
+                raise RuntimeError(f"无法从URL下载音频: {str(e)}")
 
     @classmethod
-    def IS_CHANGED(s, audio):
-        # 对于URL输入，直接用URL做hash，否则用文件内容hash
-        if audio.startswith('http://') or audio.startswith('https://'):
-            return hashlib.sha256(audio.encode('utf-8')).hexdigest()
-        audio_path = folder_paths.get_annotated_filepath(audio)
-        m = hashlib.sha256()
-        with open(audio_path, 'rb') as f:
-            m.update(f.read())
-        return m.digest().hex()
+    def IS_CHANGED(s, source_type, audio, url):
+        if source_type == "file":
+            audio_path = folder_paths.get_annotated_filepath(audio)
+            m = hashlib.sha256()
+            with open(audio_path, 'rb') as f:
+                m.update(f.read())
+            return m.digest().hex()
+        else:
+            # URL模式下，只要URL变化就重新执行
+            return url
 
+    # 添加UI字段可见性控制
+    @classmethod
+    def CHANGED_WIDGETS(s, source_type):
+        if source_type == "file":
+            return {"audio": {"visible": True}, "url": {"visible": False}}
+        else:
+            return {"audio": {"visible": False}, "url": {"visible": True}}
 
 class UVR5:
     """
@@ -107,14 +128,14 @@ class UVR5:
 
     Class methods
     -------------
-    INPUT_TYPES (dict): 
+    INPUT_TYPES (dict):
         Tell the main program input parameters of nodes.
     IS_CHANGED:
         optional method to control when the node is re executed.
 
     Attributes
     ----------
-    RETURN_TYPES (`tuple`): 
+    RETURN_TYPES (`tuple`):
         The type of each element in the output tulple.
     RETURN_NAMES (`tuple`):
         Optional: The name of each output in the output tulple.
@@ -132,7 +153,7 @@ class UVR5:
     """
     def __init__(self):
         pass
-    
+
     @classmethod
     def INPUT_TYPES(s):
         """
@@ -159,7 +180,7 @@ class UVR5:
                     "default": "HP5-主旋律人声vocals+其他instrumentals.pth"
                 }),
                 "agg":("INT",{
-                    "default": 10, 
+                    "default": 10,
                     "min": 0, #Minimum value
                     "max": 20, #Maximum value
                     "step": 1, #Slider's step
@@ -181,7 +202,7 @@ class UVR5:
     CATEGORY = "AIFSH_UVR5"
 
     def split(self, audio, model,agg,format0):
-        
+
         if model == "onnx_dereverb_By_FoxJoy":
             if not os.path.isfile(os.path.join(weights_path,"uvr5_weights/onnx_dereverb_By_FoxJoy", "vocals.onnx")):
                 hf_hub_download(
@@ -226,7 +247,7 @@ class UVR5:
         inp_path = inp_root
         need_reformat = 1
         done = 0
-        
+
         info = ffmpeg.probe(inp_path, cmd="ffprobe")
         if (
             info["streams"][0]["channels"] == 2
@@ -239,7 +260,7 @@ class UVR5:
             done = 1
         else:
             need_reformat = 1
-            
+
         if need_reformat == 1:
             tmp_path = "%s/%s.reformatted.wav" % (
                 input_path,
@@ -249,13 +270,13 @@ class UVR5:
                 f'ffmpeg -i "{inp_path}" -vn -acodec pcm_s16le -ac 2 -ar 44100 "{tmp_path}" -y'
             )
             inp_path = tmp_path
-        
+
         if done == 0:
             vocal_AUDIO,bgm_AUDIO = pre_fun._path_audio_(
                 inp_path, save_root_ins, save_root_vocal, format0,is_hp3
             )
             print("%s->Success" % (os.path.basename(inp_path)))
-        
+
         try:
             if model_name == "onnx_dereverb_By_FoxJoy":
                 del pre_fun.pred.model
@@ -277,4 +298,4 @@ class UVR5:
         This method is used in the core repo for the LoadImage node where they return the image hash as a string, if the image hash
         changes between executions the LoadImage node is executed again.
     """
-    
+
