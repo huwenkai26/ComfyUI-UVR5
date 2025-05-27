@@ -1,5 +1,5 @@
 WEB_DIRECTORY = "./web"
-from .nodes import LoadAudioPath, UVR5,PreViewAudio
+from .nodes import LoadAudioPath, UVR5,PreViewAudio, AudioURLLoader
 
 # Set the web directory, any .js file in that directory will be loaded by the frontend as a frontend extension
 # WEB_DIRECTORY = "./somejs"
@@ -9,6 +9,7 @@ from .nodes import LoadAudioPath, UVR5,PreViewAudio
 NODE_CLASS_MAPPINGS = {
     "UVR5_Node": UVR5,
     "LoadAudioPath": LoadAudioPath,
+    "AudioURLLoader": AudioURLLoader,
     "PreViewAudio": PreViewAudio
 }
 
@@ -16,6 +17,7 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "UVR5_Node": "UVR5 Node",
     "LoadAudioPath": "LoadAudioPath",
+    "AudioURLLoader": "AudioURLLoader",
     "PreViewAudio": "PreView Audio"
 
 }

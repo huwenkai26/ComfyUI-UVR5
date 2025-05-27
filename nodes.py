@@ -14,6 +14,7 @@ from huggingface_hub import hf_hub_download
 from .uvr5.mdxnet import MDXNetDereverb
 from .uvr5.vr import AudioPre, AudioPreDeEcho
 from cuda_malloc import cuda_malloc_supported
+from urllib.parse import urlparse
 import torchaudio
 
 input_path = folder_paths.get_input_directory()
@@ -25,6 +26,56 @@ device= "cuda" if cuda_malloc_supported() else "cpu"
 is_half=True
 AUDIO_EXTENSIONS = ['.mp3', '.wav', '.flac', '.ogg', '.m4a']
 
+class AudioURLLoader:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "url": ("STRING", {"default": "https://example.com/audio.mp3"}),
+            }
+        }
+
+    RETURN_TYPES = ("AUDIO",)
+    FUNCTION = "media_utilities_load_audio"
+    CATEGORY = "AIFSH_UVR5"
+
+    def media_utilities_load_audio(self, url):
+        try:
+            # Check if URL is valid
+            parsed_url = urlparse(url)
+            if not parsed_url.scheme or not parsed_url.netloc:
+                raise ValueError(f"Invalid URL: {url}")
+
+            # Download audio file
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
+
+            # Create temporary file to save the audio
+            extension = os.path.splitext(parsed_url.path)[1].lower()
+            if extension not in AUDIO_EXTENSIONS:
+                extension = '.mp3'  # Default extension if not recognized
+
+            with tempfile.NamedTemporaryFile(suffix=extension, delete=False) as temp_file:
+                temp_path = temp_file.name
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        temp_file.write(chunk)
+
+            # Load audio using torchaudio
+            waveform, sample_rate = torchaudio.load(temp_path)
+
+            # Cleanup temporary file
+            os.unlink(temp_path)
+
+            # Return audio in ComfyUI format
+            return ({"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate},)
+
+        except Exception as e:
+            print(f"Error loading audio from URL: {str(e)}")
+            # Return empty audio in case of error
+            waveform = torch.zeros((1, 2, 1))
+            sample_rate = 44100
+            return ({"waveform": waveform, "sample_rate": sample_rate},)
 
 class PreViewAudio:
     @classmethod
@@ -64,21 +115,19 @@ class LoadAudioPath:
         files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f)) and f.split('.')[-1].lower() in ["wav", "mp3","flac","m4a"]]
         return {"required":
                     {"source_type": (["file", "url"], {"default": "url"}),
-                     "audio": ("STRING", {"default": "https://"}),
+                     "audio": ("STRING", {"default": ""}),
                     },
                }
 
     CATEGORY = "AIFSH_UVR5"
 
-    RETURN_TYPES = ("AUDIOPATH", "AUDIO")
+    RETURN_TYPES = ("AUDIOPATH",)
     FUNCTION = "load_audio"
 
     def load_audio(self, source_type, audio, _audio_changed=False):
         if source_type == "file":
             audio_path = folder_paths.get_annotated_filepath(audio)
-            waveform, sample_rate = torchaudio.load(audio_path)
-
-            return (audio_path,{"waveform": waveform, "sample_rate": sample_rate})
+            return (audio_path,)
         else:
             # 处理URL
             try:
@@ -100,8 +149,8 @@ class LoadAudioPath:
                 # 下载文件
                 print(f"下载音频文件: {url} 到 {save_path}")
                 urllib.request.urlretrieve(url, save_path)
-                waveform, sample_rate = torchaudio.load(save_path)
-                return (save_path,{"waveform": waveform, "sample_rate": sample_rate})
+
+                return (save_path,)
             except Exception as e:
                 print(f"下载音频文件失败: {str(e)}")
                 raise RuntimeError(f"无法从URL下载音频: {str(e)}")
