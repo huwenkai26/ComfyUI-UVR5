@@ -64,7 +64,7 @@ class LoadAudioPath:
         files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f)) and f.split('.')[-1].lower() in ["wav", "mp3","flac","m4a"]]
         return {"required":
                     {"source_type": (["file", "url"], {"default": "url"}),
-                     "audio": ("STRING", {"default": ""}),
+                     "audio": ("STRING", {"default": "https://"}),
                     },
                }
 
