@@ -120,13 +120,15 @@ class LoadAudioPath:
 
     CATEGORY = "AIFSH_UVR5"
 
-    RETURN_TYPES = ("AUDIOPATH",)
+    RETURN_TYPES = ("AUDIOPATH", "AUDIO")
     FUNCTION = "load_audio"
 
     def load_audio(self, source_type, audio, _audio_changed=False):
         if source_type == "file":
             audio_path = folder_paths.get_annotated_filepath(audio)
-            return (audio_path,)
+            waveform, sample_rate = torchaudio.load(audio_path)
+
+            return (audio_path,{"waveform": waveform, "sample_rate": sample_rate})
         else:
             # 处理URL
             try:
@@ -148,8 +150,8 @@ class LoadAudioPath:
                 # 下载文件
                 print(f"下载音频文件: {url} 到 {save_path}")
                 urllib.request.urlretrieve(url, save_path)
-
-                return (save_path,)
+                waveform, sample_rate = torchaudio.load(save_path)
+                return (save_path,{"waveform": waveform, "sample_rate": sample_rate})
             except Exception as e:
                 print(f"下载音频文件失败: {str(e)}")
                 raise RuntimeError(f"无法从URL下载音频: {str(e)}")
