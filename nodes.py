@@ -14,7 +14,6 @@ from huggingface_hub import hf_hub_download
 from .uvr5.mdxnet import MDXNetDereverb
 from .uvr5.vr import AudioPre, AudioPreDeEcho
 from cuda_malloc import cuda_malloc_supported
-from urllib.parse import urlparse
 import torchaudio
 
 input_path = folder_paths.get_input_directory()
@@ -26,7 +25,7 @@ device= "cuda" if cuda_malloc_supported() else "cpu"
 is_half=True
 AUDIO_EXTENSIONS = ['.mp3', '.wav', '.flac', '.ogg', '.m4a']
 
-class AudioURLLoader:
+class AudioURLLoader2:
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -42,7 +41,7 @@ class AudioURLLoader:
     def media_utilities_load_audio(self, url):
         try:
             # Check if URL is valid
-            parsed_url = urlparse(url)
+            parsed_url = urllib.parse.urlparse(url)
             if not parsed_url.scheme or not parsed_url.netloc:
                 raise ValueError(f"Invalid URL: {url}")
 
